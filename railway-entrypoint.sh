@@ -2,8 +2,20 @@
 # rvg-box — بوت غیرتعاملی روی Railway
 set -e
 
-# HOST الزامی است: دامنه‌ی عمومی سرویس Railway (از Networking → Generate Domain)
-: "${HOST:?متغیر HOST را در Railway تنظیم کنید — دامنه‌ی عمومی سرویس، مثل rvgbox-production.up.railway.app}"
+# HOST: اول متغیر دستی، بعد RAILWAY_PUBLIC_DOMAIN خودکار (بعد از Generate Domain + Deploy جدید ست می‌شود)
+HOST="${HOST:-${RAILWAY_PUBLIC_DOMAIN:-}}"
+HOST="${HOST#https://}"
+HOST="${HOST#http://}"   # اگر اشتباهاً با پروتکل کپی شده باشد
+
+if [ -z "$HOST" ]; then
+    echo "ERROR: دامنه پیدا نشد (HOST خالی است)."
+    echo "راه‌حل: ۱) یک دامنه‌ی عمومی بسازید (Settings → Networking → Generate Domain)"
+    echo "       و سپس یک Deploy جدید بزنید — Railway خودش RAILWAY_PUBLIC_DOMAIN را ست می‌کند."
+    echo "       یا ۲) متغیر HOST را با مقدار دامنه (بدون https://) بسازید و Deploy جدید بزنید."
+    echo "       توجه: متغیرها فقط روی دیپلوی‌های بعدی اثر می‌کنند."
+    exit 1
+fi
+
 PORT="${PORT:-8080}"          # Railway این پورت را تزریق می‌کند
 USER_COUNT="${USER_COUNT:-3}"
 USER_PREFIX="${USER_PREFIX:-user}"

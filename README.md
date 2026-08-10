@@ -58,7 +58,7 @@ vless://<uuid>@vps.example.com:443?encryption=none&fp=chrome&type=ws&host=vps.ex
 
 | دستور | توضیح |
 |---|---|
-| `init [--host H] [--port P] [--transport ws\|httpupgrade] [--tls-cert F --tls-key F] [--listen IP] [--path P] [--clash-port N]` | ساخت وضعیت پایه (در `~/.config/rvgbox/state.json`) |
+| `init [--host H] [--port P] [--transport ws\|httpupgrade] [--tls-cert F --tls-key F] [--tls-mode none\|direct\|edge] [--listen IP] [--path P] [--clash-port N] [--force]` | ساخت وضعیت پایه (در `~/.config/rvgbox/state.json`) |
 | `user add <name...>` | افزودن کاربر (UUID تصادفی) |
 | `user add --count N <base>` | افزودن N کاربر با نام پایه (user1..userN) |
 | `user list` | فهرست کاربران + لینک |
@@ -90,7 +90,7 @@ python3 rvgbox.py init --host vps.example.com --port 443 \
 sing-box روی پورت بالا بدون TLS گوش می‌دهد؛ Caddy/Nginx گواهی می‌گیرد و پروکسی می‌کند:
 
 ```bash
-python3 rvgbox.py init --host vps.example.com --port 8443
+python3 rvgbox.py init --host vps.example.com --port 8443 --tls-mode edge
 ```
 
 Caddyfile:
@@ -104,7 +104,20 @@ vps.example.com {
 در این حالت لینک‌ها `security=tls` دارند ولی sing-box TLS را نمی‌بیند — TLS در Caddy تمام می‌شود
 (دقیقاً همان مدل RVG روی Railway، اما با هسته‌ی واقعی).
 
-### ۳) بدون TLS (فقط تست/شبکه داخلی)
+### ۳) Railway / PaaS با TLS در لبه (edge)
+
+بدون گواهی روی sing-box؛ TLS در edge سرویس‌دهنده تمام می‌شود و ws خام به کانتینر می‌رسد
+(دقیقاً همان معماری RVG روی Railway):
+
+```bash
+python3 rvgbox.py init --host min.up.railway.app --port 443 --tls-mode edge
+```
+
+- لینک‌ها `security=tls&sni=<دامنه>` دارند، اما کانفیگ سرور بلوک tls ندارد
+- روی Railway: Dockerfile + railway-entrypoint.sh آماده در ریپو (تست محلی با docker هم در راهنما هست)
+- راهنمای گام‌به‌گام: [RAILWAY.md](RAILWAY.md)
+
+### ۴) بدون TLS (فقط تست/شبکه داخلی)
 
 ```bash
 python3 rvgbox.py init --host 192.168.1.50 --port 4430
@@ -131,6 +144,7 @@ python3 rvgbox.py init --host 192.168.1.50 --port 4430
   "path": "/ws",
   "tls_cert": "/etc/letsencrypt/.../fullchain.pem",
   "tls_key": "/etc/letsencrypt/.../privkey.pem",
+  "tls_mode": "direct",   # direct | edge (Railway/Caddy) | none
   "clash_secret": "...",
   "clash_port": 9090,
   "users": [{"name": "alice", "uuid": "..."}]

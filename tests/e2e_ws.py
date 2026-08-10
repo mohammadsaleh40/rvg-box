@@ -8,8 +8,10 @@ import struct
 import sys
 
 UUID = sys.argv[1] if len(sys.argv) > 1 else "6b6f689a-8421-4dc6-ae74-faf999cddf52"
+HOST = sys.argv[2] if len(sys.argv) > 2 else "127.0.0.1"
+PORT = int(sys.argv[3]) if len(sys.argv) > 3 else 4430
+PATH = sys.argv[4] if len(sys.argv) > 4 else "/ws"
 TARGET_HOST, TARGET_PORT = "example.com", 80
-HOST, PORT, PATH = "127.0.0.1", 4430, "/ws"
 
 
 def build_vless_header(uuid: str, host: str, port: int) -> bytes:

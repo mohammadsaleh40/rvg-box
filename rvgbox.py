@@ -10,7 +10,8 @@ https://github.com/SagerNet/sing-box/releases) + پایتون 3 استاندار
 
 استفاده:
     rvgbox.py init [--host HOST] [--port PORT] [--transport ws|httpupgrade]
-                   [--tls-cert F --tls-key F] [--listen IP] [--path P] [--clash-port N]
+                   [--tls-cert F --tls-key F] [--tls-mode none|direct|edge]
+                   [--listen IP] [--path P] [--clash-port N] [--force]
     rvgbox.py user add <name>...            # یک یا چند کاربر
     rvgbox.py user add --count 5 demo       # ۵ کاربر demo1..demo5
     rvgbox.py user list
@@ -29,6 +30,11 @@ https://github.com/SagerNet/sing-box/releases) + پایتون 3 استاندار
     rvgbox.py user add alice bob
     rvgbox.py serve -o server.json && rvgbox.py check
     sudo rvgbox.py run          # پورت 443 نیاز به root دارد
+
+استقرار روی Railway (TLS در لبه — بدون گواهی روی sing-box):
+    rvgbox.py init --host min-domen.up.railway.app --port 443 --tls-mode edge
+    # لینک‌ها security=tls دارند ولی sing-box خودش TLS ندارد — Railway لبه TLS را قطع می‌کند
+    # (Dockerfile + railway-entrypoint.sh در ریپو؛ متغیرهای HOST و PORT را Railway می‌دهد)
 """
 
 import argparse
@@ -82,7 +88,8 @@ def vless_link(state: dict, user: dict) -> str:
     host = state["host"]
     port = state["port"]
     transport = state.get("transport", DEFAULT_TRANSPORT)
-    tls = bool(state.get("tls_cert")) and bool(state.get("tls_key"))
+    tls_mode = state.get("tls_mode",
+                         "direct" if (state.get("tls_cert") and state.get("tls_key")) else "none")
 
     params = {
         "encryption": "none",
@@ -93,7 +100,8 @@ def vless_link(state: dict, user: dict) -> str:
     else:  # httpupgrade
         params.update({"type": "httpupgrade", "host": host,
                        "path": state.get("path", DEFAULT_PATH_HP)})
-    if tls:
+    # edge = TLS در لبه (Railway/CDN/Caddy): کلاینت tls می‌زند ولی sing-box گواهی ندارد
+    if tls_mode in ("direct", "edge"):
         params.update({"security": "tls", "sni": host, "alpn": "http/1.1"})
 
     query = "&".join(f"{k}={urllib.parse.quote(str(v))}" for k, v in params.items())
@@ -116,12 +124,15 @@ def render_server(state: dict) -> dict:
         "type": "vless",
         "tag": "vless-in",
         "listen": state.get("listen", DEFAULT_LISTEN),
-        "listen_port": state["port"],
+        # روی Railway پورت با متغیر محیطی PORT داده می‌شود؛ در محلی از state استفاده می‌شود
+        "listen_port": int(os.environ.get("PORT") or state["port"]),
         "users": [{"uuid": u["uuid"], "name": u["name"]} for u in state["users"]],
         "transport": {"type": transport_type, "path": path},
     }
 
-    if state.get("tls_cert") and state.get("tls_key"):
+    tls_mode = state.get("tls_mode",
+                         "direct" if (state.get("tls_cert") and state.get("tls_key")) else "none")
+    if tls_mode == "direct":
         inbound["tls"] = {
             "enabled": True,
             "server_name": state["host"],
@@ -152,9 +163,9 @@ def render_server(state: dict) -> dict:
 
 # ── دستورها ──────────────────────────────────────────────────────────────────
 def cmd_init(args):
-    if STATE_FILE.exists():
+    if STATE_FILE.exists() and not args.force:
         state = load_state()
-        print(f"[i] وضعیت قبلاً ساخته شده ({STATE_FILE}).")
+        print(f"[i] وضعیت قبلاً ساخته شده ({STATE_FILE}). (برای بازسازی: --force)")
     else:
         state = {
             "host": args.host,
@@ -164,6 +175,7 @@ def cmd_init(args):
             "path": args.path or (DEFAULT_PATH_HP if args.transport == "httpupgrade" else DEFAULT_PATH_WS),
             "tls_cert": args.tls_cert,
             "tls_key": args.tls_key,
+            "tls_mode": args.tls_mode or ("direct" if (args.tls_cert and args.tls_key) else "none"),
             "clash_secret": secrets.token_urlsafe(12),
             "clash_port": args.clash_port,
             "users": [],
@@ -171,9 +183,9 @@ def cmd_init(args):
         save_state(state)
         print(f"[+] وضعیت در {STATE_FILE} ساخته شد.")
 
-    tls = bool(state.get("tls_cert")) and bool(state.get("tls_key"))
+    tls_mode = state.get("tls_mode", "direct" if (state.get("tls_cert") and state.get("tls_key")) else "none")
     print(f"    host      : {state['host']}")
-    print(f"    port      : {state['port']}  (TLS: {'بله' if tls else 'خیر — پشت ریورس‌پراکسی یا بدون TLS'})")
+    print(f"    port      : {state['port']}  (TLS: {'مستقیم' if tls_mode == 'direct' else ('لبه (edge)' if tls_mode == 'edge' else 'خیر')})")
     print(f"    transport : {state.get('transport')}  path={state.get('path')}")
     print(f"    users     : {len(state['users'])}")
     if not state["users"]:
@@ -340,8 +352,11 @@ def main():
     pi.add_argument("--transport", choices=["ws", "httpupgrade"], default=DEFAULT_TRANSPORT,
                     help="ترابرد: ws یا httpupgrade (پیش‌فرض ws)")
     pi.add_argument("--path", default=None, help="مسیر ترابرد (پیش‌فرض /ws یا /hp)")
-    pi.add_argument("--tls-cert", default=None, help="مسیر گواهی TLS (fullchain.pem)")
-    pi.add_argument("--tls-key", default=None, help="مسیر کلید خصوصی TLS (privkey.pem)")
+    pi.add_argument("--tls-cert", default=None, help="مسیر گواهی TLS (fullchain.pem) — حالت direct")
+    pi.add_argument("--tls-key", default=None, help="مسیر کلید خصوصی TLS (privkey.pem) — حالت direct")
+    pi.add_argument("--tls-mode", choices=["none", "direct", "edge"], default=None,
+                    help="direct=گواهی روی sing-box | edge=TLS در لبه (Railway/Caddy/CDN) | none=بدون TLS")
+    pi.add_argument("--force", action="store_true", help="بازسازی وضعیت حتی اگر موجود باشد (کاربران حذف می‌شوند)")
     pi.add_argument("--clash-port", type=int, default=CLASH_PORT,
                     help="پورت Clash API محلی (پیش‌فرض 9090؛ اگر اشغال بود عوض کنید)")
     pi.set_defaults(func=cmd_init)

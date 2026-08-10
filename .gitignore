@@ -2,8 +2,6 @@
 server.json
 *.json.tmp
 
-# وضعیت محلی (شامل UUID کاربران — هرگز commit نکنید)
-~/.config/rvgbox/
-
+# وضعیت محلی کاربر (UUID ها) بیرون از ریپو نگه داشته می‌شود: ~/.config/rvgbox/
 __pycache__/
 *.pyc

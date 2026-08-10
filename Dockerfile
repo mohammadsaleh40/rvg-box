@@ -4,7 +4,7 @@ FROM debian:bookworm-slim
 ARG TARGETARCH
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl ca-certificates \
+    && apt-get install -y --no-install-recommends curl ca-certificates python3 \
     && case "$TARGETARCH" in \
          amd64) A=amd64 ;; \
          arm64) A=arm64 ;; \

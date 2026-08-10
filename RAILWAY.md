@@ -26,6 +26,8 @@ Railway Edge (TLS را قطع می‌کند → ws خام)
 1. در داشبورد Railway: **New Project → Deploy from GitHub repo** → `mohammadsaleh40/rvg-box` را انتخاب کنید.
 2. Railway خودش Dockerfile را تشخیص می‌دهد. بیلد چند دقیقه طول می‌کشد.
 3. بعد از اولین دیپلوی، تب **Settings → Networking → Public Networking → Generate Domain** را بزنید تا دامنه بسازد (مثلاً `rvgbox-production.up.railway.app`).
+   - Railway از شما **پورت** می‌پرسد: **8080** وارد کنید (پورت داخلی کانتینر = همان `$PORT`؛ در لاگ دیپلوی هم چاپ می‌شود: `port=8080`). این پورت ربطی به پورت کلاینت (443) ندارد — کلاینت همیشه از 443 وصل می‌شود.
+   - گزینه‌ی **Generate Domain** (HTTP/HTTPS) را بزنید، نه **TCP Proxy** (برای ws لازم نیست).
 4. تب **Variables** این متغیرها را اضافه کنید:
    - `HOST` = دامنه‌ای که ساخته شد (مثلاً `rvgbox-production.up.railway.app`) ← **الزامی**
    - `USER_COUNT` = تعداد کاربر (پیش‌فرض ۳)
